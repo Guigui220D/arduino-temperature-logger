@@ -1,11 +1,15 @@
 #include "LiquidCrystal.h"
 #include "RTClib.h"
+#include "SD.h"
+#include "Wire.h"
 
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 RTC_DS1307 rtc;
 
 TimeSpan interval(0, 1, 0, 0); // Once every hour
 DateTime last;
+
+File logFile;
 
 #define LCD_BACKLIGHT 10
 #define LCD_BUTTONS 0
@@ -20,12 +24,33 @@ void setup() {
   lcd.setCursor(0,0);
   
   if (! rtc.begin()) {
-    lcd.print("Could not find RTC...");
-    while (1) delay(10);
+    lcd.print("Cant find RTC");
+    while(1) delay(10);
   }
 
-  last = rtc.now();
+  char fileName[] = "LOG00.CSV";
+  for (uint8_t i = 0; i < 99; i++) {
+    fileName[3] = i/10 + '0';
+    fileName[4] = i%10 + '0';
 
+    if (!SD.exists(fileName)) {
+      logFile = SD.open(fileName, FILE_WRITE);
+      break;
+    }
+  }
+
+  Wire.begin();
+  if (!rtc.begin()) {
+    lcd.print("Cant open file");
+    while(1) delay(10);
+  }
+
+  logFile.println("time,from");
+  logFile.flush();
+  
+  logIt(false);
+  last = rtc.now();
+  
   lcd.print("Ready!");
   delay(1000);
 }
@@ -93,7 +118,27 @@ bool needsLog() {
 }
 
 void logIt(bool user) {
-  
+  DateTime now = rtc.now();
+
+  logFile.print(now.day(), DEC);
+  logFile.print("/");
+  logFile.print(now.month(), DEC);
+  logFile.print("/");
+  logFile.print(now.year(), DEC);
+  logFile.print(" ");
+  logFile.print(now.hour(), DEC);
+  logFile.print(":");
+  logFile.print(now.minute(), DEC);
+  logFile.print(":");
+  logFile.print(now.second(), DEC);
+
+  logFile.print(",");
+  if (user) {
+    logFile.print("user");
+  } else {
+    logFile.print("hourly");
+  }
+  logFile.flush();
 }
 
 void updatePrint(DateTime now) {
